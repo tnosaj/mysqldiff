@@ -559,7 +559,7 @@ ALTER TABLE zap ADD SPATIAL INDEX idx_polygons (polygons);
 ## --- file: tmp.db1
 ## +++ file: tmp.db2
 
-ALTER TABLE zap DROP INDEX idx_polygons;
+ALTER TABLE zap DROP INDEX idx_polygons; # was SPATIAL INDEX (polygons)
 ',
   ],
 );
