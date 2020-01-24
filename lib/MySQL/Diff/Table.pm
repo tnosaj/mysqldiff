@@ -239,6 +239,32 @@ sub _parse {
             last;
         }
 
+        if (/^\)\s*(.*?)$/) { # extended table definition
+            $self->{options} = $1;
+            debug(4,"got extended table options '$self->{options}'");
+            next;
+        }
+
+        if ($self->{options}) {
+          if (/^\)\s*(.*?)$/) { # extended table definition
+            $self->{options} = $1;
+            debug(1,"1 got extended table options '$1'");
+            next;
+          } elsif (/^PARTITION (.*) VALUES (.*) THAN \((.*)\) ENGINE = InnoDB$/) { # extended table definition
+            my ($name, $op, $val) = ($1, $2, $3);
+            debug(1,"2 got extended table options name:'$1' op: '$2' val: '$3' ");
+            $self->{partitions}{$name} = $val;
+            $self->{partition_ops} = $op;
+            next;
+          } elsif (/^PARTITION (.*) VALUES (.*) THAN (.*) ENGINE = InnoDB\) \*\/\;$/) { # extended table definition
+            my ($name, $op, $val) = ($1, $2, $3);
+            debug(1,"3 got extended table options name:'$1' op: '$2' val: '$3' ");
+            $self->{partitions}{$name} = $val;
+            $self->{partition_ops} = $op;
+            last;
+          }
+        }
+
         if (/^(\S+)\s*(.*)/) {
             my ($field, $fdef) = ($1, $2);
             croak "definition for field '$field' duplicated in table '$self->{name}'\n"
