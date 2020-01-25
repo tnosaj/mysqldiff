@@ -23,6 +23,7 @@ MySQL::Diff::Table - Table Definition Class
   my $isunique      = $db->is_unique($field);
   my $isspatial     = $db->is_spatial($field);
   my $isfulltext    = $db->is_fulltext($field);
+  my $ipatitioned   = $db->is_paritioned($field);
 
 =head1 DESCRIPTION
 
@@ -135,6 +136,10 @@ Returns 1 if given field is used as fulltext index field, otherwise returns 0.
 
 Returns 1 if given field is defined as an auto increment field, otherwise returns 0.
 
+=item * is_paritioned
+
+Returns if given fiel is a praritioned field
+
 =back
 
 =cut
@@ -156,6 +161,7 @@ sub is_spatial      { my $self = shift; return $_[0] && $self->{spatial}{$_[0]} 
 sub is_fulltext     { my $self = shift; return $_[0] && $self->{fulltext}{$_[0]} ? 1 : 0; }
 sub is_auto_inc     { my $self = shift; return $_[0] && $self->{auto_inc}{$_[0]} ? 1 : 0; }
 
+sub is_partitioned  { my $self = shift; return $_[0] && $self->{partitions}{$_[0]}  ? 1 : 0; }
 # ------------------------------------------------------------------------------
 # Private Methods
 
@@ -218,7 +224,7 @@ sub _parse {
             croak "SPATIAL index '$key' duplicated in table '$self->{name}'\n"
                 if $self->{fulltext}{$key};
             $self->{indices}{$key} = $val;
-           $self->{spatial}{$key} = 1;
+            $self->{spatial}{$key} = 1;
             debug(4,"got SPATIAL index '$key': ($val)");
             next;
         }
@@ -252,19 +258,10 @@ sub _parse {
 
         if ($self->{options}) {
           # option is set, but wait, there is more to this schema... e.g. a patition?
-          # if (/^\(*PARTITION (.*) VALUES (.*) THAN \((.*)\) ENGINE = InnoDB\)* \*\/\;$/$/) { # extended table definition
-          if (/^\(*PARTITION (\S+?) VALUES (\S+?) THAN \(*(.*\)*) ENGINE = InnoDB\)*/) { # extended table definition
-            my ($name, $op, $val) = ($1, $2, $3);
-            debug(1," got extended table options name:'$1' op: '$2' val: '$3' ");
+            debug(1," got extended partition table options name:'$1' op: '$2' val: '$3' ");
             $self->{partitions}{$name}{val} = $val;
             $self->{partitions}{$name}{op} = $op;
             next;
-          } elsif (/^PARTITION (.*) VALUES (.*) THAN (.*) ENGINE = InnoDB\) \*\/\;$/) { # extended table definition
-            my ($name, $op, $val) = ($1, $2, $3);
-            debug(1,"3 got extended table options name:'$1' op: '$2' val: '$3' ");
-            $self->{partitions}{$name}{val} = $val;
-            $self->{partitions}{$name}{op} = $op;
-            last;
           }
         }
 
