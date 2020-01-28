@@ -354,7 +354,6 @@ sub _diff_partitions {
       for my $partition (keys %$partitions1) {
         debug(3,"table1 had partition '$partition'");
         if ($partitions2 && $partitions2->{$partition}){
-           debug(5,"both have partition '$partition'");
            if( ($partitions1->{$partition}{val} ne $partitions2->{$partition}{val}) or
                ($partitions1->{$partition}{op} ne $partitions2->{$partition}{op})){
                 debug(3,"partition '$partition' for values '$partitions1->{$partition}{op}' THAN '$partitions1->{$partition}{val}' changed");
@@ -364,7 +363,6 @@ sub _diff_partitions {
                 $changes .= "\nALTER TABLE $name1 ADD PARTITION (PARTITION $partition VALUES $partitions2->{$partition}{op} THAN ($partitions2->{$partition}{val}));\n";
                 push @changes, $changes;
             }
-           debug(5,"both have partition '$partition'");
         } else {
             # ALTER TABLE t1 DROP PARTITION p0, p1;
             debug(3,"partition '$partition' for values '$partitions1->{$partition}{op}' THAN '$partitions1->{$partition}{val}' removed");
@@ -380,10 +378,7 @@ sub _diff_partitions {
     # ALTER TABLE t1 ADD PARTITION (PARTITION p3 VALUES LESS THAN (2002));
     if($partitions2) {
         for my $partition (keys %$partitions2) {
-          next if($partitions1 && 
-               $partitions1->{$partition} && 
-               $partitions1->{$partition}{val} eq $partitions2->{$partition}{val} &&
-               $partitions1->{$partition}{op} eq $partitions2->{$partition}{op});
+          next if($partitions1 && $partitions1->{$partition});
           debug(3,"partition '$partition' for values '$partitions2->{$partition}{op}' THAN '$partitions2->{$partition}{val}' added");
           push @changes, "ALTER TABLE $name1 ADD PARTITION (PARTITION $partition VALUES $partitions2->{$partition}{op} THAN ($partitions2->{$partition}{val}));\n";
         }
