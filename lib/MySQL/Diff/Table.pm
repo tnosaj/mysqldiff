@@ -15,6 +15,7 @@ MySQL::Diff::Table - Table Definition Class
   my $fields        = $db->fields();                # %$fields
   my $primary_key   = $db->primary_key();
   my $indices       = $db->indices();               # %$indices
+  my $partitions    = $db->partitions();            # %$partitions
   my $options       = $db->options();
 
   my $isfield       = $db->isa_field($field);
@@ -103,6 +104,10 @@ Returns a hash reference to fields used as primary key fields.
 
 Returns a hash reference to fields used as index fields.
 
+=item * partitions
+
+Returns a hash reference to fields used as partitions.
+
 =item * options
 
 Returns the additional options added to the table definition.
@@ -150,6 +155,7 @@ sub field           { my $self = shift; return $self->{fields}{$_[0]};  }
 sub fields          { my $self = shift; return $self->{fields};         }
 sub primary_key     { my $self = shift; return $self->{primary_key};    }
 sub indices         { my $self = shift; return $self->{indices};        }
+sub partitions      { my $self = shift; return $self->{partitions};     }
 sub options         { my $self = shift; return $self->{options};        }
 sub foreign_key     { my $self = shift; return $self->{foreign_key};    }
 
