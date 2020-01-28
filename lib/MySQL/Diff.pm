@@ -338,7 +338,6 @@ sub _diff_indices {
     return @changes;
 }
 
-# ALTER TABLE t1 ADD PARTITION (PARTITION p3 VALUES LESS THAN (2002));
 sub _diff_partitions {
     my ($self, $table1, $table2) = @_;
 
@@ -353,10 +352,32 @@ sub _diff_partitions {
 
     if($partitions1) {
       for my $partition (keys %$partitions1) {
-        debug(3,"table1 has partition '$partition'");
+        debug(3,"table1 had partition '$partition'");
+        if ($partitions2 && $partitions2->{$partition}){
+           debug(5,"both have partition '$partition'");
+           if( ($partitions1->{$partition}{val} ne $partitions2->{$partition}{val}) or
+               ($partitions1->{$partition}{op} ne $partitions2->{$partition}{op})){
+                debug(3,"partition '$partition' for values '$partitions1->{$partition}{op}' THAN '$partitions1->{$partition}{val}' changed");
+                my $changes = "ALTER TABLE $name1 DROP PARTITION $partition;";
+                $changes .= " # was VALUES '$partitions1->{$partition}{op}' THAN '$partitions1->{$partition}{val}'"
+                    unless $self->{opts}{'no-old-defs'};
+                $changes .= "\nALTER TABLE $name1 ADD PARTITION (PARTITION $partition VALUES $partitions2->{$partition}{op} THAN ($partitions2->{$partition}{val}));\n";
+                push @changes, $changes;
+            }
+           debug(5,"both have partition '$partition'");
+        } else {
+            # ALTER TABLE t1 DROP PARTITION p0, p1;
+            debug(3,"partition '$partition' for values '$partitions1->{$partition}{op}' THAN '$partitions1->{$partition}{val}' removed");
+            my $changes = "ALTER TABLE $name1 DROP PARTITION $partition;";
+            $changes .= " # was VALUES '$partitions1->{$partition}{op}' THAN '$partitions1->{$partition}{val}'"
+                unless $self->{opts}{'no-old-defs'};
+            $changes .= "\n";
+            push @changes, $changes;
+        }
       }
     }
 
+    # ALTER TABLE t1 ADD PARTITION (PARTITION p3 VALUES LESS THAN (2002));
     if($partitions2) {
         for my $partition (keys %$partitions2) {
           next if($partitions1 && 
