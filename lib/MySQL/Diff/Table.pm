@@ -253,7 +253,7 @@ sub _parse {
         #
         # either we stop up there, or we have addition settings
         # I can only think of paritions as an extension, so thats
-        # the only stuff define bellow as a swithc case of an "option"
+        # the only stuff define bellow as a switch case of an "option"
         # with additional table "options"
         #
         if (/^\)\s*(.*?)$/) { # extended table definition
@@ -264,9 +264,9 @@ sub _parse {
 
         if ($self->{options}) {
           # option is set, but wait, there is more to this schema... e.g. a patition?
-          if(/^\(?PARTITION (\S+?) VALUES (\S+?) THAN \(*(.*\)?)\sENGINE = InnoDB\)*/){
+          if(/^\(?PARTITION (\S+?) VALUES (\S+?) THAN \(*(.*?)\)?\sENGINE = InnoDB\)*/){
             my ($name, $op, $val) = ($1, $2, $3);
-            debug(1," got extended partition table options name:'$1' op: '$2' val: '$3' ");
+            debug(4," got extended partition table options name:'$1' op: '$2' val: '$3' ");
             $self->{partitions}{$name}{val} = $val;
             $self->{partitions}{$name}{op} = $op;
             next;
