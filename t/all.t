@@ -647,6 +647,23 @@ ALTER TABLE pip ADD PARTITION (PARTITION p22 VALUES LESS THAN (23));
 ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
 ',
   ],
+  'remove partition' =>
+  [
+    {},
+    $tables{pip1},
+    $tables{pip2},
+    '## mysqldiff <VERSION>
+##
+## Run on <DATE>
+##
+## --- file: tmp.db1
+## +++ file: tmp.db2
+
+ALTER TABLE pip DROP PARTITION p24; # was VALUES 'LESS' THAN 'MAXVALUE'
+ALTER TABLE pip DROP PARTITION p23; # was VALUES 'LESS' THAN '24'
+ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
+',
+  ],
 );
 
 my $BAIL = check_setup();
