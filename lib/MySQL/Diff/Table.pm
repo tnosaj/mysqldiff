@@ -245,32 +245,40 @@ sub _parse {
             next;
         }
 
-        if (/^\)\s*(.*?);$/) { # end of table definition
+        if (/^\)\s*(.*?)(;?)$/) { # end of table definition
             $self->{options} = $1;
-            debug(4,"got table options '$self->{options}'");
-            last;
-        }
-        #
-        # either we stop up there, or we have addition settings
-        # I can only think of paritions as an extension, so thats
-        # the only stuff define bellow as a switch case of an "option"
-        # with additional table "options"
-        #
-        if (/^\)\s*(.*?)$/) { # extended table definition
-            $self->{options} = $1;
-            debug(4,"got extended table options '$self->{options}'");
+            if ($2){ # there is a ; at the end 
+              debug(4,"got table options '$self->{options}'");
+              last;
+            }
+            debug(4,"got table options '$self->{options}' but no end ';'");
             next;
         }
 
         if ($self->{options}) {
           # option is set, but wait, there is more to this schema... e.g. a patition?
-          if(/^\(?PARTITION (\S+?) VALUES (\S+?) THAN \(*(.*?)\)?\sENGINE = InnoDB\)*/){
-            my ($name, $op, $val) = ($1, $2, $3);
-            debug(4," got extended partition table options name:'$1' op: '$2' val: '$3' ");
-            $self->{partitions}{$name}{val} = $val;
-            $self->{partitions}{$name}{op} = $op;
+          #
+          # got field def '/*!50100': PARTITION BY RANGE (HOUR(timestamp)) '
+          if(/^\/\*\!\d{5}\sPARTITION\sBY\s(\S+?)\s\((.+)\)/){
+            my ($func, $opt) = ($1, $2);
+            debug(4," got partition function:'$func' with op: '$opt'");
+            $self->{partition}{function} = $func;
+            $self->{partition}{option} = $opt;
             next;
           }
+          if($self->{partition}{function} eq "RANGE"){
+            if(/^\(?PARTITION (\S+?) VALUES (\S+?) THAN \(*(.*?)\)?\sENGINE = InnoDB(.*)/){
+              my ($name, $op, $val, $term) = ($1, $2, $3, $4);
+              debug(4," got extended partition table options name:'$name' op: '$op' val: '$val' ");
+              $self->{partitions}{$name}{val} = $val;
+              $self->{partitions}{$name}{op} = $op;
+              if ($term =~ m/;/) {
+                  debug(4," got last section - ending");
+                  last;
+              }
+              next;
+            }
+          } # we can add other functions here such as hash... etc.
         }
 
         if (/^(\S+)\s*(.*)/) {
