@@ -204,6 +204,13 @@ CREATE TABLE pip (
     PARTITION p23 VALUES LESS THAN MAXVALUE
 );
 ',
+  pip3 => '
+CREATE TABLE pip (
+    id VARCHAR(255) NOT NULL,
+    timestamp DATETIME(3) NOT NULL,
+    PRIMARY KEY(id,timestamp)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+',
 
 );
 
@@ -665,6 +672,23 @@ ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
 ',
   ],
 );
+  #  'add partitioning' =>
+  #  [
+  #    {},
+  #    $tables{pip1},
+  #    $tables{pip3},
+  #    '## mysqldiff <VERSION>
+  ###
+  ### Run on <DATE>
+  ###
+  ### --- file: tmp.db1
+  ### +++ file: tmp.db2
+  #
+  #ALTER TABLE pip DROP PARTITION p24; # was VALUES 'LESS' THAN 'MAXVALUE'
+  #ALTER TABLE pip DROP PARTITION p23; # was VALUES 'LESS' THAN '24'
+  #ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
+  #',
+  #  ],
 
 my $BAIL = check_setup();
 plan skip_all => $BAIL  if($BAIL);
