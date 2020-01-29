@@ -139,11 +139,10 @@ CREATE TABLE zap (
 ',
 
   pip1 => '
-CREATE TABLE zap (
+CREATE TABLE pip (
     id VARCHAR(255) NOT NULL,
     timestamp DATETIME(3) NOT NULL,
-    PRIMARY KEY(id),
-    INDEX `idx_timestamp` (`timestamp`)
+    PRIMARY KEY(id,timestamp)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin
     PARTITION BY RANGE (HOUR(`timestamp`)) (
     PARTITION p0 VALUES LESS THAN (1),
@@ -173,11 +172,10 @@ CREATE TABLE zap (
 ',
 
   pip2 => '
-CREATE TABLE zap (
+CREATE TABLE pip (
     id VARCHAR(255) NOT NULL,
     timestamp DATETIME(3) NOT NULL,
-    PRIMARY KEY(id),
-    INDEX `idx_timestamp` (`timestamp`)
+    PRIMARY KEY(id,timestamp)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin
     PARTITION BY RANGE (HOUR(`timestamp`)) (
     PARTITION p0 VALUES LESS THAN (1),
@@ -631,6 +629,8 @@ ALTER TABLE zap ADD SPATIAL INDEX idx_polygons (polygons);
 ALTER TABLE zap DROP INDEX idx_polygons; # was SPATIAL INDEX (polygons)
 ',
   ],
+
+  'Add partition' =>
   [
     {},
     $tables{pip1},
