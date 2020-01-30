@@ -144,7 +144,7 @@ CREATE TABLE pip (
     timestamp DATETIME(3) NOT NULL,
     PRIMARY KEY(id,timestamp)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin
-    PARTITION BY RANGE (HOUR(`timestamp`)) (
+    PARTITION BY RANGE (HOUR(timestamp)) (
     PARTITION p0 VALUES LESS THAN (1),
     PARTITION p1 VALUES LESS THAN (2),
     PARTITION p2 VALUES LESS THAN (3),
@@ -177,7 +177,7 @@ CREATE TABLE pip (
     timestamp DATETIME(3) NOT NULL,
     PRIMARY KEY(id,timestamp)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin
-    PARTITION BY RANGE (HOUR(`timestamp`)) (
+    PARTITION BY RANGE (HOUR(timestamp)) (
     PARTITION p0 VALUES LESS THAN (1),
     PARTITION p1 VALUES LESS THAN (2),
     PARTITION p2 VALUES LESS THAN (3),
@@ -657,8 +657,8 @@ ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
   'remove partition' =>
   [
     {},
-    $tables{pip1},
     $tables{pip2},
+    $tables{pip1},
     '## mysqldiff <VERSION>
 ##
 ## Run on <DATE>
@@ -666,29 +666,12 @@ ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
 ## --- file: tmp.db1
 ## +++ file: tmp.db2
 
-ALTER TABLE pip DROP PARTITION p24; # was VALUES 'LESS' THAN 'MAXVALUE'
-ALTER TABLE pip DROP PARTITION p23; # was VALUES 'LESS' THAN '24'
-ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
+ALTER TABLE pip DROP PARTITION p23; # was VALUES \'LESS\' THAN \'MAXVALUE\'
+ALTER TABLE pip DROP PARTITION p22; # was VALUES \'LESS\' THAN \'23\'
+ALTER TABLE pip ADD PARTITION (PARTITION p22 VALUES LESS THAN (MAXVALUE));
 ',
   ],
 );
-  #  'add partitioning' =>
-  #  [
-  #    {},
-  #    $tables{pip1},
-  #    $tables{pip3},
-  #    '## mysqldiff <VERSION>
-  ###
-  ### Run on <DATE>
-  ###
-  ### --- file: tmp.db1
-  ### +++ file: tmp.db2
-  #
-  #ALTER TABLE pip DROP PARTITION p24; # was VALUES 'LESS' THAN 'MAXVALUE'
-  #ALTER TABLE pip DROP PARTITION p23; # was VALUES 'LESS' THAN '24'
-  #ALTER TABLE pip ADD PARTITION (PARTITION p23 VALUES LESS THAN (MAXVALUE));
-  #',
-  #  ],
 
 my $BAIL = check_setup();
 plan skip_all => $BAIL  if($BAIL);
