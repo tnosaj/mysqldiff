@@ -210,7 +210,7 @@ sub _parse {
             my ($key, $val) = ($1, $2);
             if (/^(?:CONSTRAINT\s+(.*)?)?\s+FOREIGN\s+KEY\s+\((.+?)\)\sREFERENCES\s(.+?)\s\((.+?)\)(.*)/) {
               my ($const_name, $const_local_column, $const_parent_table, $const_parent_column, $const_options) = ($1, $2, $3, $4, $5);
-              $self->{parent}{$const_name} = $const_parent_table;
+              $self->{parents}{$const_name} = $const_parent_table;
             }
             croak "foreign key '$key' duplicated in table '$name'\n"
                 if $self->{foreign_key}{$key};
