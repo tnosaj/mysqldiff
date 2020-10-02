@@ -15,6 +15,7 @@ MySQL::Diff::Table - Table Definition Class
   my $fields        = $db->fields();                # %$fields
   my $primary_key   = $db->primary_key();
   my $indices       = $db->indices();               # %$indices
+  my $parents       = $db->parents();               # %$parents
   my $partitions    = $db->partitions();            # %$partitions
   my $options       = $db->options();
 
@@ -103,6 +104,10 @@ Returns a hash reference to fields used as primary key fields.
 =item * indices
 
 Returns a hash reference to fields used as index fields.
+
+=item * parents
+
+Returns a hash reference to fields used as parents.
 
 =item * partitions
 
@@ -210,7 +215,7 @@ sub _parse {
             my ($key, $val) = ($1, $2);
             if (/^(?:CONSTRAINT\s+(.*)?)?\s+FOREIGN\s+KEY\s+\((.+?)\)\sREFERENCES\s(.+?)\s\((.+?)\)(.*)/) {
               my ($const_name, $const_local_column, $const_parent_table, $const_parent_column, $const_options) = ($1, $2, $3, $4, $5);
-              $self->{parents}{$const_name} = $const_parent_table;
+              $self->{parents}{$const_parent_table} = $const_name;
             }
             croak "foreign key '$key' duplicated in table '$name'\n"
                 if $self->{foreign_key}{$key};

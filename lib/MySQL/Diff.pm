@@ -121,6 +121,7 @@ sub diff {
     for my $table1 ($self->db1->tables()) {
         my $diffs;
         my $name = $table1->name();
+	my $parents = $table1->parents();
         $used_tables{'-- '. $name} = 1;
         debug(4, "table 1 $name = ".Dumper($table1));
         debug(2,"looking at tables called '$name'");
@@ -135,12 +136,13 @@ sub diff {
             #     unless $self->{opts}{'only-both'} || $self->{opts}{'keep-old-tables'};
         }
         $unsorted_changes{$name}{'diffs'}=$diffs;
-        $unsorted_changes{$name}{'parents'}=$table1->$parents();
+        $unsorted_changes{$name}{'parents'}=$parents;
     }
 
     for my $table2 ($self->db2->tables()) {
         my $diffs;
         my $name = $table2->name();
+	my $parents = $table2->parents();
         $used_tables{'-- '. $name} = 1;
         debug(4, "table 2 $name = ".Dumper($table2));
         if (! $self->db1->table_by_name($name)) {
@@ -151,13 +153,13 @@ sub diff {
             #     unless $self->{opts}{'only-both'};
         }
         $unsorted_changes{$name}{'diffs'}=$diffs;
-        $unsorted_changes{$name}{'parents'}=$table2->$parents();
+        $unsorted_changes{$name}{'parents'}=$parents;
     }
-
+    
     # Sort for Parents
     my %checked_changes;
     debug(1,"Start sorting for parental constraints");
-
+    debug(1,"Lets see: ".Dumper(%unsorted_changes));
     foreach my $t (keys %unsorted_changes) {
         debug(1,"Checking table: ".$t);
         push @changes, add($t);
@@ -178,7 +180,7 @@ sub diff {
         }else{
             debug(1, $table." has no parents, returning");
             $checked_changes{$table} = "done";
-            return $unsorted_changes{$table}{'diff'};
+            return $unsorted_changes{$table}{'diffs'};
         }
     
         my @tmparray;
@@ -187,7 +189,7 @@ sub diff {
             push @tmparray, add($parent);
         }
         $checked_changes{$table} = "done";
-        push @tmparray, $unsorted_changes{$table}{'diff'};
+        push @tmparray, $unsorted_changes{$table}{'diffs'};
         return @tmparray;
     }
     debug(1,"Finished sorting for parental constraints");
