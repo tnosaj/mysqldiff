@@ -223,7 +223,7 @@ sub _diff_banner {
 
     my $opt_text =
         join ', ',
-            map { $self->{opts}{$_} eq '1' ? $_ : "$_=$self->{opts}{$_}" }
+            map { $self->{opts}{$_} eq '1' ? $_ : "$_=$self->{opts}{$_}"  unless $_ eq "password" }
                 keys %{$self->{opts}};
     $opt_text = "## Options: $opt_text\n" if $opt_text;
 
