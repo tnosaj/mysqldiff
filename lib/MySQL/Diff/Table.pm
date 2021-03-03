@@ -212,16 +212,19 @@ sub _parse {
         }
         
         if (/^(?:CONSTRAINT\s+(.*)?)?\s+FOREIGN\s+KEY\s+(.*)$/) {
-            my ($key, $val) = ($1, $2);
             if (/^(?:CONSTRAINT\s+(.*)?)?\s+FOREIGN\s+KEY\s+\((.+?)\)\sREFERENCES\s(.+?)\s\((.+?)\)(.*)/) {
               my ($const_name, $const_local_column, $const_parent_table, $const_parent_column, $const_options) = ($1, $2, $3, $4, $5);
-              $self->{parents}{$const_parent_table} = $const_name;
+              debug(1,"new foreign key $const_local_column-$const_parent_table-$const_parent_column");
+              my $key = "${const_local_column}|${const_parent_table}|${const_parent_column}";
+              my $val = "${const_local_column}|${const_parent_table}|${const_parent_column}";
+
+              $self->{parents}{$const_parent_table} = $key; 
+              croak "foreign key '$key' duplicated in table '$name'\n"
+                  if $self->{foreign_key}{$key};
+              debug(1,"got foreign key $key");
+              $self->{foreign_key}{$key} = $val;
+              next;
             }
-            croak "foreign key '$key' duplicated in table '$name'\n"
-                if $self->{foreign_key}{$key};
-            debug(1,"got foreign key $key");
-            $self->{foreign_key}{$key} = $val;
-            next;
         }
 
         if (/^(KEY|UNIQUE(?: KEY)?)\s+(\S+?)(?:\s+USING\s+(?:BTREE|HASH|RTREE))?\s*\((.*)\)(?:\s+USING\s+(?:BTREE|HASH|RTREE))?$/) {
