@@ -230,10 +230,10 @@ sub _parse {
         if (/^(KEY|UNIQUE(?: KEY)?)\s+(\S+?)(?:\s+USING\s+(?:BTREE|HASH|RTREE))?\s*\((.*)\)(?:\s+USING\s+(?:BTREE|HASH|RTREE))?$/) {
             my ($type, $key, $val) = ($1, $2, $3);
             croak "index '$key' duplicated in table '$self->{name}'\n"
-                if $self->{indices}{$key};
-            $self->{indices}{$key} = $val;
-            $self->{unique}{$key} = 1   if($type =~ /unique/i);
-            debug(4, "got ", defined $self->{unique}{$key} ? 'unique ' : '', "index key '$key': ($val)");
+                if $self->{indices}{$val};
+            $self->{indices}{$val} = $val;
+            $self->{unique}{$val} = 1   if($type =~ /unique/i);
+            debug(4, "got ", defined $self->{unique}{$val} ? 'unique ' : '', "index key '$val': ($val)");
             next;
         }
 
