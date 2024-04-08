@@ -279,6 +279,7 @@ sub _parse {
 
         if (/^\)\s*(.*?)(;?)$/) { # end of table definition
             $self->{options} = $1;
+            my $ending = $2;
             if (/^\)\s*ENGINE=([^\s;]+).*\s+DEFAULT CHARSET=([^\s;]+)\s+COLLATE=([^\s;]+)/) {
               $self->{engine} = $1;
               $self->{charset} = $2;
@@ -287,7 +288,7 @@ sub _parse {
             } else {
               debug(1,"no regexp match for option content");
             } 
-            if ($2){ # there is a ; at the end 
+            if ($ending){ # there is a ; at the end 
               debug(4,"got table options '$self->{options}'");
               last;
             }
