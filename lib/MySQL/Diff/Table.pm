@@ -8,27 +8,27 @@ MySQL::Diff::Table - Table Definition Class
 
   use MySQL::Diff::Table
 
-  my $db = MySQL::Diff::Database->new(%options);
-  my $def           = $db->def();
-  my $name          = $db->name();
-  my $field         = $db->field();
-  my $fields        = $db->fields();                # %$fields
-  my $primary_key   = $db->primary_key();
-  my $indices       = $db->indices();               # %$indices
-  my $parents       = $db->parents();               # %$parents
-  my $partitions    = $db->partitions();            # %$partitions
-  my $options       = $db->options();
-  my $engine        = $db->engine();
-  my $charset       = $db->charset();
-  my $collate       = $db->collate();
+  my $table = MySQL::Diff::Table->new(%options);
+  my $def           = $table->def();
+  my $name          = $table->name();
+  my $field         = $table->field();
+  my $fields        = $table->fields();                # %$fields
+  my $primary_key   = $table->primary_key();
+  my $indices       = $table->indices();               # %$indices
+  my $parents       = $table->parents();               # %$parents
+  my $partitions    = $table->partitions();            # %$partitions
+  my $options       = $table->options();
+  my $engine        = $table->engine();
+  my $charset       = $table->charset();
+  my $collate       = $table->collate();
 
-  my $isfield       = $db->isa_field($field);
-  my $isprimary     = $db->isa_primary($field);
-  my $isindex       = $db->isa_index($field);
-  my $isunique      = $db->is_unique($field);
-  my $isspatial     = $db->is_spatial($field);
-  my $isfulltext    = $db->is_fulltext($field);
-  my $ipatitioned   = $db->is_paritioned($field);
+  my $isfield       = $table->isa_field($field);
+  my $isprimary     = $table->isa_primary($field);
+  my $isindex       = $table->isa_index($field);
+  my $isunique      = $table->is_unique($field);
+  my $isspatial     = $table->is_spatial($field);
+  my $isfulltext    = $table->is_fulltext($field);
+  my $ipatitioned   = $table->is_paritioned($field);
 
 =head1 DESCRIPTION
 
@@ -163,7 +163,7 @@ Returns 1 if given field is defined as an auto increment field, otherwise return
 
 =item * is_paritioned
 
-Returns if given fiel is a praritioned field
+Returns if given field is a paritioned field
 
 =back
 
@@ -228,7 +228,7 @@ sub _parse {
 
             next;
         }
-        
+
         if (/^(?:CONSTRAINT\s+(.*)?)?\s+FOREIGN\s+KEY\s+(.*)$/) {
             my $val = $2;
             if (/^(?:CONSTRAINT\s+(.*)?)?\s+FOREIGN\s+KEY\s+\((.+?)\)\sREFERENCES\s(.+?)\s\((.+?)\)(.*)/) {
@@ -236,7 +236,7 @@ sub _parse {
               debug(1,"new foreign key $const_local_column-$const_parent_table-$const_parent_column");
               my $key = "$self->{name}_${const_local_column}_${const_parent_table}_${const_parent_column}";
 
-              $self->{parents}{$const_parent_table} = $key; 
+              $self->{parents}{$const_parent_table} = $key;
               croak "foreign key '$key' duplicated in table '$name'\n"
                   if $self->{foreign_key}{$key};
               debug(1,"got foreign key $key");
@@ -287,7 +287,7 @@ sub _parse {
               debug(4,"options contained $1 $2 $3");
             } else {
               debug(1,"no regexp match for option content");
-            } 
+            }
             if ($ending){ # there is a ; at the end 
               debug(4,"got table options '$self->{options}'");
               last;
