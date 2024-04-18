@@ -61,7 +61,7 @@ sub new {
     if($hash{debug})        { debug_level($hash{debug})     ; delete $hash{debug};      }
     if($hash{debug_file})   { debug_file($hash{debug_file}) ; delete $hash{debug_file}; }
 
-    debug(3,"\nconstructing new MySQL::Diff");
+    debug(3,"\nconstructing new MySQL::Diff, opts: @{[%hash]}");
 
     return $self;
 }
@@ -118,6 +118,7 @@ sub diff {
 
     debug(1, "\ncomparing databases");
 
+
     for my $table1 ($self->db1->tables()) {
         my @diffs;
         my $name = $table1->name();
@@ -157,7 +158,7 @@ sub diff {
         push @{$unsorted_changes{$name}{'diffs'}},@diffs;
         $unsorted_changes{$name}{'parents'}=$parents;
     }
-    
+
     debug(1,"Unsorted_changes: ".Dumper(%unsorted_changes));
 
     # Sort for Parents
@@ -170,14 +171,14 @@ sub diff {
 
     sub add {
         my $table = $_[0];
-    
+
         if (exists $checked_changes{$table}) {
             debug(5,"table ".$table." in sorted hash, skipping");
             return;
         }else{
             debug(5,"table ".$table." not in sorted hash, adding");
         }
-    
+
         if (exists $unsorted_changes{$table}{'parents'}) {
             debug(5, $table." has parents, checking");
         }else{
@@ -185,7 +186,7 @@ sub diff {
             $checked_changes{$table} = "done";
             return @{$unsorted_changes{$table}{'diffs'}};
         }
-    
+
         my @tmparray;
         foreach my $parent (keys %{$unsorted_changes{$table}{'parents'}}) {
             debug(5,"Doing parent table: ".$parent." of ".$table);
@@ -198,6 +199,30 @@ sub diff {
     }
     debug(1,"Finished sorting for parental constraints");
 
+    for my $event1 ($self->db1->events()) {
+        my $name = $event1->name();
+        debug(4, "event 1 $name = ".Dumper($event1));
+        debug(2,"looking at events called '$name'");
+        if (my $event2 = $self->db2->event_by_name($name)) {
+            debug(3,"comparing events called '$name'");
+            push @changes, $self->_diff_events($event1, $event2);
+        } else {
+            debug(3,"event '$name' dropped");
+            push @changes, "DROP EVENT $name;\n\n"
+                 unless $self->{opts}{'only-both'} || $self->{opts}{'keep-old-events'};
+        }
+    }
+
+    for my $event2 ($self->db2->events()) {
+        my $name = $event2->name();
+        debug(4, "event 2 $name = ".Dumper($event2));
+        if (! $self->db1->event_by_name($name)) {
+            debug(3,"event '$name' added");
+            debug(4,"event '$name' added '".$event2->def()."'");
+            push @changes, $event2->def() . "\n"
+                 unless $self->{opts}{'only-both'};
+         }
+    }
 
     debug(1,join '', @changes);
 
@@ -234,7 +259,7 @@ sub _diff_banner {
     my $now = scalar localtime();
     return <<EOF;
 ## mysqldiff $VERSION
-## 
+##
 ## Run on $now
 $opt_text##
 ## --- $summary1
@@ -252,7 +277,7 @@ sub _diff_tables {
         $self->_diff_partitions(@_),
         $self->_diff_primary_key(@_),
         $self->_diff_foreign_key_add(@_),
-        $self->_diff_options(@_)        
+        $self->_diff_options(@_)
     );
 
     $changes[-1] =~ s/\n*$/\n/  if (@changes);
@@ -276,7 +301,7 @@ sub _diff_fields {
     return () unless $fields1 || $fields2;
 
     my @changes;
-  
+
     if($fields1) {
         for my $field (keys %$fields1) {
             debug(3,"table1 had field '$field'");
@@ -293,7 +318,7 @@ sub _diff_fields {
                 debug(10,"F2 now field '$f2'");
 
                 if ($f1 ne $f2) {
-                    if (not $self->{opts}{tolerant} or 
+                    if (not $self->{opts}{tolerant} or
                         (($f1 !~ m/$f2\(\d+,\d+\)/) and
                          ($f1 ne "$f2 DEFAULT '' NOT NULL") and
                          ($f1 ne "$f2 NOT NULL") ))
@@ -351,7 +376,7 @@ sub _diff_indices {
     if($indices1) {
         for my $index (keys %$indices1) {
             debug(3,"table1 had index '$index'");
-            my $old_type = $table1->is_unique($index) ? 'UNIQUE' : 
+            my $old_type = $table1->is_unique($index) ? 'UNIQUE' :
                            $table1->is_spatial($index) ? 'SPATIAL INDEX' :
                            $table1->is_fulltext($index) ? 'FULLTEXT INDEX' : 'INDEX';
 
@@ -362,7 +387,7 @@ sub _diff_indices {
                     ($table1->is_fulltext($index) xor $table2->is_fulltext($index)) )
                 {
                     debug(3,"index '$index' changed");
-                    my $new_type = $table2->is_unique($index) ? 'UNIQUE' : 
+                    my $new_type = $table2->is_unique($index) ? 'UNIQUE' :
                                    $table2->is_spatial($index) ? 'SPATIAL INDEX' :
                                    $table2->is_fulltext($index) ? 'FULLTEXT INDEX' : 'INDEX';
 
@@ -399,6 +424,68 @@ sub _diff_indices {
             push @changes, "ALTER TABLE $name1 ADD $new_type $index ($indices2->{$index});\n";
         }
     }
+    return @changes;
+}
+
+sub _diff_events {
+    my ($self, $event1, $event2) = @_;
+
+    my $name1 = $event1->name();
+
+    my @changes;
+
+    debug(3,"event1 '$event1'");
+    debug(3,"event2 '$event2'");
+
+    my $schedule_changed = 0;
+    my $enable_changed   = 0;
+    my $preserve_changed = 0;
+    my $body_changed = 0;
+
+    if($event1->schedule() ne $event2->schedule()) {
+      debug(3, "schedule changed");
+      $schedule_changed = 1;
+    }
+
+    if($event1->preserve() ne $event2->preserve()) {
+      debug(3, "preserve changed");
+      $preserve_changed = 1;
+    }
+
+    if($event1->enable() ne $event2->enable()) {
+      debug(3, "enable changed");
+      $enable_changed = 1;
+    }
+
+    if($event1->body() ne $event2->body()) {
+      debug(3, "body changed");
+      $body_changed = 1;
+    }
+
+    if($schedule_changed or $preserve_changed or $enable_changed or $body_changed) {
+      my $change = "DELIMITER ;;\nALTER EVENT $name1";
+
+      if($schedule_changed) {
+        $change .= " ON SCHEDULE $event2->{schedule}";
+      }
+
+      if($preserve_changed) {
+        $change .= " ON COMPLETION $event2->{preserve}";
+      }
+
+      if($enable_changed) {
+        $change .= " $event2->{enable}";
+      }
+
+      if($body_changed) {
+        $change .= " DO $event2->{body}";
+      }
+
+      $change .= ";; \nDELIMITER ;";
+
+      push @changes, $change;
+    }
+
     return @changes;
 }
 
@@ -462,7 +549,7 @@ sub _diff_primary_key {
     return () unless $primary1 || $primary2;
 
     my @changes;
-  
+
     if ($primary1 && ! $primary2) {
         debug(3,"primary key '$primary1' dropped");
         my $changes = _index_auto_col($table2, $primary1);
@@ -502,13 +589,13 @@ sub _diff_foreign_key_drop {
     return () unless $fks1 || $fks2;
 
     my @changes;
-  
+
     if($fks1) {
         for my $fk (keys %$fks1) {
             debug(1,"$name1 has fk '$fk'");
 
             if ($fks2 && $fks2->{$fk}) {
-                if($fks1->{$fk}->{'value'} ne $fks2->{$fk}->{'value'}) 
+                if($fks1->{$fk}->{'value'} ne $fks2->{$fk}->{'value'})
                 {
                     debug(1,"foreign key '$fk' changed");
                     my $changes = "ALTER TABLE $name1 DROP FOREIGN KEY $fks1->{$fk}->{'name'};";
@@ -661,18 +748,18 @@ sub _load_database {
         $self->{opts}{"user$authnum"}     ||
         $self->{opts}{"password$authnum"} ||
         $self->{opts}{"socket$authnum"}) {
-        return MySQL::Diff::Database->new(db => $arg, auth => \%auth, 'single-transaction' => $self->{opts}{'single-transaction'}, 'table-re' => $self->{opts}{'table-re'});
+        return MySQL::Diff::Database->new(db => $arg, auth => \%auth, 'single-transaction' => $self->{opts}{'single-transaction'}, 'table-re' => $self->{opts}{'table-re'}, events => $self->{opts}{events});
     }
 
     if (-f $arg) {
-        return MySQL::Diff::Database->new(file => $arg, auth => \%auth, 'single-transaction' => $self->{opts}{'single-transaction'}, 'table-re' => $self->{opts}{'table-re'});
+        return MySQL::Diff::Database->new(file => $arg, auth => \%auth, 'single-transaction' => $self->{opts}{'single-transaction'}, 'table-re' => $self->{opts}{'table-re'}, events => $self->{opts}{events});
     }
 
     my %dbs = MySQL::Diff::Database::available_dbs(%auth);
     debug(2, "  available databases: ", (join ', ', keys %dbs), "\n");
 
     if ($dbs{$arg}) {
-        return MySQL::Diff::Database->new(db => $arg, auth => \%auth, 'single-transaction' => $self->{opts}{'single-transaction'}, 'table-re' => $self->{opts}{'table-re'});
+        return MySQL::Diff::Database->new(db => $arg, auth => \%auth, 'single-transaction' => $self->{opts}{'single-transaction'}, 'table-re' => $self->{opts}{'table-re'}, events => $self->{opts}{events});
     }
 
     warn "'$arg' is not a valid file or database.\n";

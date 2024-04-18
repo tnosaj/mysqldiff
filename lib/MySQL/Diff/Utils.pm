@@ -88,10 +88,10 @@ is equal to or lower than the current debug level.
                 return;
             }
         }
-        
+
         print STDERR @_,"\n";
     }
-    
+
 }
 
 1;

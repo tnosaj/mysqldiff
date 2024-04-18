@@ -250,7 +250,37 @@ CREATE TABLE piq (
     PRIMARY KEY(id,timestamp)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 ',
-
+  evt1 => '
+CREATE TABLE evt (
+  id INT(11) NOT NULL auto_increment,
+  foreign_id INT(11) NOT NULL,
+  PRIMARY KEY (id)
+) DEFAULT CHARACTER SET utf8;
+',
+  evt2 => '
+CREATE TABLE evt (
+  id INT(11) NOT NULL auto_increment,
+  foreign_id INT(11) NOT NULL,
+  PRIMARY KEY (id)
+) DEFAULT CHARACTER SET utf8;
+DELIMITER ;;
+CREATE EVENT example_event ON SCHEDULE EVERY 1 DAY STARTS \'2020-01-01 00:00:00\' ON COMPLETION PRESERVE ENABLE DO BEGIN
+  CALL backup_script();
+ END ;;
+DELIMITER ;
+',
+ evt3 => '
+CREATE TABLE evt (
+  id INT(11) NOT NULL auto_increment,
+  foreign_id INT(11) NOT NULL,
+  PRIMARY KEY (id)
+) DEFAULT CHARACTER SET utf8;
+DELIMITER ;;
+CREATE EVENT example_event ON SCHEDULE EVERY 2 DAY STARTS \'2020-01-01 01:00:00\'  ON COMPLETION NOT PRESERVE DISABLE DO BEGIN
+  CALL another_backup_script();
+ END ;;
+DELIMITER ;
+',
 );
 
 my %tests = (
@@ -328,11 +358,11 @@ ALTER TABLE foo DROP COLUMN field;
 
 ALTER TABLE foo ADD COLUMN field blob;
 CREATE TABLE bar (
-  id int(11) NOT NULL auto_increment,
+  id int NOT NULL auto_increment,
   ctime datetime default NULL,
   utime datetime default NULL,
   name char(16) default NULL,
-  age int(11) default NULL,
+  age int default NULL,
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -460,7 +490,6 @@ ALTER TABLE foo ADD PRIMARY KEY (id,foreign_id);
 ALTER TABLE foo DROP INDEX id;
 ',
   ],
-      
   'drop additional primary key' =>
   [
     {},
@@ -495,7 +524,6 @@ ALTER TABLE foo DROP INDEX id;
 ALTER TABLE bar ADD UNIQUE name (name,age);
 ',
   ],
-      
   'drop index' =>
   [
     {},
@@ -511,7 +539,6 @@ ALTER TABLE bar ADD UNIQUE name (name,age);
 ALTER TABLE bar DROP INDEX name; # was UNIQUE (name,age)
 ',
   ],
-      
   'alter indices' =>
   [
     {},
@@ -740,6 +767,62 @@ ALTER TABLE piq ADD PARTITION (PARTITION p7 VALUES IN (7));
 ALTER TABLE piq DROP PARTITION p7; # was VALUES \'IN\' \'7\'
 ',
   ],
+  'add event' =>
+  [
+    {},
+    $tables{evt1},
+    $tables{evt2},
+    '## mysqldiff <VERSION>
+##
+## Run on <DATE>
+##
+## --- file: tmp.db1
+## +++ file: tmp.db2
+
+/*!50106 DROP EVENT IF EXISTS `example_event` */;
+DELIMITER ;;
+/*!50106 CREATE*/ /*!50117 DEFINER=`root`@`localhost`*/ /*!50106 EVENT `example_event` ON SCHEDULE EVERY 1 DAY STARTS \'2024-01-01 00:00:00\' ON COMPLETION PRESERVE ENABLE DO BEGIN
+    CALL backup_script();
+   END */ ;;
+DELIMITER ;
+',
+  ],
+  'drop event' =>
+  [
+    {},
+    $tables{evt2},
+    $tables{evt1},
+    '## mysqldiff <VERSION>
+##
+## Run on <DATE>
+##
+## --- file: tmp.db1
+## +++ file: tmp.db2
+
+DROP EVENT example_event;
+',
+  ],
+  'alter event' =>
+  [
+    {},
+    $tables{evt2},
+    $tables{evt3},
+    '## mysqldiff <VERSION>
+##
+## Run on <DATE>
+##
+## --- file: tmp.db1
+## +++ file: tmp.db2
+
+DELIMITER ;;
+ALTER EVENT example_event ON SCHEDULE EVERY 2 DAY STARTS \'2024-01-01 00:00:00\' ON COMPLETION NOT PRESERVE DISABLE DO BEGIN
+
+    CALL another_backup_script();
+
+  END;;
+DELIMITER ;
+',
+  ]
 );
 
 my $BAIL = check_setup();

@@ -14,6 +14,8 @@ MySQL::Diff::Database - Database Definition Class
   my $name      = $db->name();
   my @tables    = $db->tables();
   my $table_def = $db->table_by_name($table);
+  my @events    = $db->events();
+  my $event_def = $db->event_by_name($event);
 
   my @dbs = MySQL::Diff::Database::available_dbs();
 
@@ -38,6 +40,7 @@ use IO::File;
 
 use MySQL::Diff::Utils qw(debug);
 use MySQL::Diff::Table;
+use MySQL::Diff::Event;
 
 # ------------------------------------------------------------------------------
 
@@ -71,6 +74,7 @@ sub new {
     $self->{_source}{dbh} = $p{dbh} if $p{dbh};
     $self->{'single-transaction'} = $p{'single-transaction'};
     $self->{'table-re'} = $p{'table-re'};
+    $self->{events} = $p{events};
 
     if ($p{file}) {
         $self->_canonicalise_file($p{file});
@@ -109,7 +113,7 @@ Provides a summary of the database.
 
 sub summary {
     my $self = shift;
-  
+
     if ($self->{_source}{file}) {
         return "file: " . $self->{_source}{file};
     } elsif ($self->{_source}{db}) {
@@ -155,7 +159,29 @@ Returns the table definition (see L<MySQL::Diff::Table>) for the given table.
 
 sub table_by_name {
     my ($self,$name) = @_;
-    return $self->{_by_name}{$name};
+    return $self->{_tables_by_name}{$name};
+}
+
+=item * events()
+
+Returns a list of events for the current database.
+
+=cut
+
+sub events {
+    my $self = shift;
+    return @{$self->{_events}};
+}
+
+=item * event_by_name()
+
+Returns the event definition (see L<MySQL::Diff::Event>) for the given event.
+
+=cut
+
+sub event_by_name {
+    my ($self,$name) = @_;
+    return $self->{_events_by_name}{$name};
 }
 
 =back
@@ -177,8 +203,8 @@ Note that is used as a function call, not a method call.
 sub available_dbs {
     my %auth = @_;
     my $args_ref = _auth_args_string(%auth);
-    unshift @$args_ref, q{mysqlshow}; 
-  
+    unshift @$args_ref, q{mysqlshow};
+
     # evil but we don't use DBI because I don't want to implement -p properly
     # not that this works with -p anyway ...
     my $command = shell_quote @$args_ref;
@@ -211,11 +237,11 @@ sub _canonicalise_file {
     # hopefully the temp db is unique!
     my $temp_db = sprintf "test_mysqldiff-temp-%d_%d_%d", time(), $$, rand();
     debug(3,"creating temporary database $temp_db");
-  
+
     my $defs = read_file($file);
     die "$file contains dangerous command '$1'; aborting.\n"
         if $defs =~ /;\s*(use|((drop|create)\s+database))\b/i;
-  
+
     my $args = $self->{_source}{auth};
     my $fh = IO::File->new("| mysql $args") or die "Couldn't execute 'mysql$args': $!\n";
     print $fh "\nCREATE DATABASE \`$temp_db\`;\nUSE \`$temp_db\`;\n";
@@ -284,6 +310,7 @@ sub _get_defs {
     my ( $self, $db ) = @_;
 
     my $args   = $self->{_source}{auth};
+    my $events = $self->{events} ? "--events" : "";
     my $single_transaction = $self->{'single-transaction'} ? "--single-transaction" : "";
     my $tables = '';                       #dump all tables by default
     if ( my $table_re = $self->{'table-re'} ) {
@@ -294,10 +321,10 @@ sub _get_defs {
         }
     }
 
-    my $fh = IO::File->new("mysqldump -d $single_transaction $args $db $tables 2>&1 |")
+    my $fh = IO::File->new("mysqldump -d $events $single_transaction $args $db $tables 2>&1 |")
       or die "Couldn't read ${db}'s table defs via mysqldump: $!\n";
 
-    debug( 3, "running mysqldump -d $single_transaction $args $db $tables" );
+    debug( 3, "running mysqldump -d $events $single_transaction $args $db $tables" );
     my $defs = $self->{_defs} = [<$fh>];
     $fh->close;
     my $exit_status = $? >> 8;
@@ -319,21 +346,57 @@ EOF
 
 sub _parse_defs {
     my $self = shift;
+    debug(2, "parse_defs: @{$self->{_defs}}");
 
-    return if $self->{_tables};
+    my $table_defs = join '', grep ! /^\s*(\#|SET|\/\*\!\d{5}\sSET)/, @{$self->{_defs}};
+    $table_defs =~ s/`//sg;
+    # Delete all event defs (from this match onwards)
+    $table_defs =~ s/-- Dumping events.*\n.*//sg;
+    # Delete any other comments
+    $table_defs =~ s/^--.*$//mg;
+    # Delete empty lines
+    $table_defs =~ s/^\s*$//mg;
 
-    debug(2, "parsing table defs");
-    my $defs = join '', grep ! /^\s*(\#|--|SET|\/\*\!\d{5}\sSET)/, @{$self->{_defs}};
-    $defs =~ s/`//sg;
-    my @tables = split /(?=^\s*(?:create|alter|drop)\s+table\s+)/im, $defs;
-    $self->{_tables} = [];
-    for my $table (@tables) {
-        debug(4, "  table def [$table]");
-        if($table =~ /create\s+table/i) {
-            my $obj = MySQL::Diff::Table->new(source => $self->{_source}, def => $table);
-            push @{$self->{_tables}}, $obj;
-            $self->{_by_name}{$obj->name()} = $obj;
-        }
+    if(!$self->{_tables}) {
+      debug(2, "parsing table defs");
+      debug(4, "  defs [$table_defs]");
+      my @tables = split /(?=^\s*(?:create|alter|drop)\s+table\s+)/im, $table_defs;
+
+      debug(4, "  tables [@tables]");
+      $self->{_tables} = [];
+      for my $table (@tables) {
+          debug(4, "  table def [$table]");
+          if($table =~ /create\s+table/i) {
+              my $obj = MySQL::Diff::Table->new(source => $self->{_source}, def => $table);
+              push @{$self->{_tables}}, $obj;
+              $self->{_tables_by_name}{$obj->name()} = $obj;
+          }
+      }
+    }
+
+    my $event_defs = join '', grep ! /^\s*(\#|\/\*\!\d{5}\sSET)/, @{$self->{_defs}};
+    # Delete all table defs: ie from start until this match
+    $event_defs =~ s/^.*-- Dumping events/-- Dumping events/sg;
+    # Or any other comment
+    $event_defs =~ s/^--.*$//mg;
+
+    if(!$self->{_events}) {
+      debug(2, "parsing event defs");
+      debug(4, "  defs [$event_defs]");
+      my @events = split /(?=^.*(?:drop).*event.*)/im, $event_defs;
+
+      debug(4, "  events [@events]");
+      $self->{_events} = [];
+      for my $event (@events) {
+          debug(4, "  event def [$event]");
+          # events are always dumped with a preceding `DROP EVENT IF EXISTS` to the `CREATE EVENT` statements
+          # we need to capture it too in the def due to DELIMITER shenanigans
+          if($event =~ /.*drop.*event.*/i) {
+              my $obj = MySQL::Diff::Event->new(source => $self->{_source}, def => $event);
+              push @{$self->{_events}}, $obj;
+              $self->{_events_by_name}{$obj->name()} = $obj;
+          }
+      }
     }
 }
 
